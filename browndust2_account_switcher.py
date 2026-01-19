@@ -4,12 +4,8 @@ import winreg
 import locale
 from pathlib import Path
 from datetime import datetime
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QPushButton, QInputDialog, QMessageBox, QLabel, QListWidgetItem, QMenu
-)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QCursor
+import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog, Menu
 
 
 def get_app_dir():
@@ -19,9 +15,8 @@ def get_app_dir():
         return Path(__file__).parent
 
 
-class AccountSwitcher(QMainWindow):
+class AccountSwitcher:
     def __init__(self):
-        super().__init__()
         self.registry_path = r"SOFTWARE\Gamfs\BrownDust II"
         self.token_key_patterns = [
             "neon_access_token_h",
@@ -65,8 +60,8 @@ class AccountSwitcher(QMainWindow):
                     accounts = {k: v for k, v in data.items() if k != '_config'}
                     return accounts
             except (json.JSONDecodeError, ValueError) as e:
-                QMessageBox.warning(
-                    None, self.tr('tip') if hasattr(self, 'tr') else 'Tip', 
+                messagebox.showwarning(
+                    "提示" if hasattr(self, 'tr') else 'Tip', 
                     self.tr('data_corrupted', str(e)) if hasattr(self, 'tr') else f'Data corrupted: {e}'
                 )
                 return {}
@@ -126,9 +121,8 @@ class AccountSwitcher(QMainWindow):
         self.config['language'] = new_lang
         self.save_accounts()
         
-        self.close()
+        self.root.destroy()
         self.__init__()
-        self.show()
 
     def tr(self, key, *args):
         text = self.translations.get(key, key)
@@ -139,151 +133,132 @@ class AccountSwitcher(QMainWindow):
         return text
 
     def init_ui(self):
-        self.setWindowTitle(f"{self.tr('window_title')} - github.com/Liovovo/BrownDust2-Account-Switcher")
-        self.setMinimumSize(650, 500)
+        self.root = tk.Tk()
+        self.root.title(f"{self.tr('window_title')} - github.com/Liovovo/BrownDust2-Account-Switcher")
+        
+        width = 650
+        height = 500
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        self.root.minsize(650, 500)
 
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        main_frame = ttk.Frame(self.root, padding="15")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(0, weight=1)
 
-        title_layout = QHBoxLayout()
-        title = QLabel(self.tr('account_list'))
-        title.setStyleSheet("font-size: 16px; font-weight: bold; padding: 8px 0;")
-        title_layout.addWidget(title)
-        title_layout.addStretch()
-        
-        self.lang_btn = QPushButton("EN" if self.lang == 'zh' else "中文")
-        self.lang_btn.setMaximumWidth(50)
-        self.lang_btn.setStyleSheet("font-size: 11px; padding: 2px 5px;")
-        self.lang_btn.clicked.connect(self.switch_language)
-        title_layout.addWidget(self.lang_btn)
-        
-        layout.addLayout(title_layout)
+        title_frame = ttk.Frame(main_frame)
+        title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        title_frame.columnconfigure(0, weight=1)
 
-        current_layout = QHBoxLayout()
-        current_layout.setSpacing(8)
-        
-        self.current_account_label = QLabel()
-        self.current_account_label.setStyleSheet("""
-            QLabel {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-                background-color: #f9f9f9;
-            }
-        """)
-        self.current_account_label.setWordWrap(True)
-        current_layout.addWidget(self.current_account_label, 1)
-        
-        self.btn_refresh_current = QPushButton("↻")
-        self.btn_refresh_current.setMaximumWidth(40)
-        self.btn_refresh_current.setMinimumHeight(36)
-        self.btn_refresh_current.setStyleSheet("font-size: 18px;")
-        self.btn_refresh_current.setToolTip(self.tr('refresh_token') if self.lang == 'zh' else 'Refresh')
-        self.btn_refresh_current.clicked.connect(self.refresh_current_account)
-        current_layout.addWidget(self.btn_refresh_current)
-        
-        layout.addLayout(current_layout)
-        
+        title_label = ttk.Label(title_frame, text=self.tr('account_list'), font=('', 12, 'bold'))
+        title_label.grid(row=0, column=0, sticky=tk.W)
+
+        self.lang_btn = ttk.Button(title_frame, text="EN" if self.lang == 'zh' else "中文", 
+                                  command=self.switch_language, width=6)
+        self.lang_btn.grid(row=0, column=1, sticky=tk.E)
+
+        current_frame = ttk.Frame(main_frame)
+        current_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        current_frame.columnconfigure(0, weight=1)
+
+        self.current_account_label = ttk.Label(current_frame, text="", relief="solid", padding="8")
+        self.current_account_label.grid(row=0, column=0, sticky=(tk.W, tk.E))
+
+        self.btn_refresh_current = ttk.Button(current_frame, text="↻", width=3,
+                                            command=self.refresh_current_account)
+        self.btn_refresh_current.grid(row=0, column=1, padx=(5, 0))
+
         self.update_current_account_display()
 
-        self.account_list = QListWidget()
-        self.account_list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 5px;
-                outline: none;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #f0f0f0;
-                outline: none;
-            }
-            QListWidget::item:selected {
-                background-color: #e3f2fd;
-                color: #000;
-                outline: none;
-            }
-            QListWidget::item:hover {
-                background-color: #f5f5f5;
-            }
-            QListWidget::item:focus {
-                outline: none;
-            }
-        """)
-        self.account_list.itemDoubleClicked.connect(self.load_account)
-        self.account_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.account_list.customContextMenuRequested.connect(self.show_context_menu)
-        layout.addWidget(self.account_list)
+        list_frame = ttk.Frame(main_frame)
+        list_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.rowconfigure(0, weight=1)
+        main_frame.rowconfigure(2, weight=1)
 
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(8)
+        self.account_tree = ttk.Treeview(list_frame, columns=('info',), show='tree headings', height=15)
+        self.account_tree.heading('#0', text=self.tr('account_name') if hasattr(self, 'tr') else 'Account Name')
+        self.account_tree.heading('info', text=self.tr('account_info') if hasattr(self, 'tr') else 'Account Info')
+        self.account_tree.column('#0', width=150)
+        self.account_tree.column('info', width=450)
         
-        self.btn_refresh_token = QPushButton(self.tr('refresh_token'))
-        self.btn_refresh_token.setMinimumHeight(36)
-        self.btn_refresh_token.clicked.connect(self.refresh_token)
-        btn_layout.addWidget(self.btn_refresh_token)
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.account_tree.yview)
+        self.account_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.account_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
 
-        self.btn_save_new = QPushButton(self.tr('save_current'))
-        self.btn_save_new.setMinimumHeight(36)
-        self.btn_save_new.clicked.connect(self.save_new_account)
-        btn_layout.addWidget(self.btn_save_new)
+        self.account_tree.bind('<Double-1>', lambda e: self.load_account())
+        self.account_tree.bind('<Button-3>', self.show_context_menu)
 
-        self.btn_logout = QPushButton(self.tr('logout'))
-        self.btn_logout.setMinimumHeight(36)
-        self.btn_logout.clicked.connect(self.logout_account)
-        btn_layout.addWidget(self.btn_logout)
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=3, column=0, sticky=(tk.W, tk.E))
+        
+        self.btn_refresh_token = ttk.Button(btn_frame, text=self.tr('refresh_token'),
+                                          command=self.refresh_token)
+        self.btn_refresh_token.grid(row=0, column=0, padx=(0, 5), sticky=(tk.W, tk.E))
 
-        layout.addLayout(btn_layout)
+        self.btn_save_new = ttk.Button(btn_frame, text=self.tr('save_current'),
+                                     command=self.save_new_account)
+        self.btn_save_new.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E))
+
+        self.btn_logout = ttk.Button(btn_frame, text=self.tr('logout'),
+                                   command=self.logout_account)
+        self.btn_logout.grid(row=0, column=2, padx=(5, 0), sticky=(tk.W, tk.E))
+
+        for i in range(3):
+            btn_frame.columnconfigure(i, weight=1)
 
         self.refresh_list()
+        
+        self.root.mainloop()
 
     def refresh_list(self):
-        self.account_list.clear()
+        for item in self.account_tree.get_children():
+            self.account_tree.delete(item)
+        
         for name, values in self.accounts.items():
             info = self.parse_account_info(values)
-            item = QListWidgetItem()
             
-            display_text = f"{name}"
+            info_parts = []
             if info['platform']:
-                display_text += f"  |  {info['platform']}"
+                info_parts.append(info['platform'])
             if info['reg_nation']:
-                display_text += f"  |  {info['reg_nation']}"
+                info_parts.append(info['reg_nation'])
             if info['create_time']:
-                display_text += f"  |  {self.tr('registered')}: {info['create_time']}"
+                info_parts.append(f"{self.tr('registered')}: {info['create_time']}")
             if info['token_time']:
-                display_text += f"  |  {self.tr('token')}: {info['token_time']}"
+                info_parts.append(f"{self.tr('token')}: {info['token_time']}")
             
-            item.setText(display_text)
-            item.setData(Qt.ItemDataRole.UserRole, name)
-            self.account_list.addItem(item)
+            info_text = " | ".join(info_parts)
+            
+            self.account_tree.insert('', 'end', text=name, values=(info_text,), tags=(name,))
 
-    def show_context_menu(self, position):
-        item = self.account_list.itemAt(position)
+    def show_context_menu(self, event):
+        item = self.account_tree.identify_row(event.y)
         if not item:
             return
-
-        menu = QMenu()
-        load_action = menu.addAction(self.tr('load_account'))
-        overwrite_action = menu.addAction(self.tr('overwrite_account'))
-        menu.addSeparator()
-        rename_action = menu.addAction(self.tr('rename'))
-        delete_action = menu.addAction(self.tr('delete'))
-
-        action = menu.exec(QCursor.pos())
         
-        if action == load_action:
-            self.load_account()
-        elif action == overwrite_action:
-            self.overwrite_account()
-        elif action == rename_action:
-            self.rename_account()
-        elif action == delete_action:
-            self.delete_account()
+        self.account_tree.selection_set(item)
+        self.account_tree.focus(item)
 
+        menu = Menu(self.root, tearoff=0)
+        menu.add_command(label=self.tr('load_account'), command=self.load_account)
+        menu.add_command(label=self.tr('overwrite_account'), command=self.overwrite_account)
+        menu.add_separator()
+        menu.add_command(label=self.tr('rename'), command=self.rename_account)
+        menu.add_command(label=self.tr('delete'), command=self.delete_account)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
     def parse_account_info(self, values):
         info = {'platform': '', 'create_time': '', 'token_time': '', 'reg_nation': ''}
         
@@ -372,7 +347,7 @@ class AccountSwitcher(QMainWindow):
     def update_current_account_display(self):
         current_values = self.read_registry_values()
         if not current_values:
-            self.current_account_label.setText(f"{self.tr('current_login')}: {self.tr('not_logged_in')}")
+            self.current_account_label.config(text=f"{self.tr('current_login')}: {self.tr('not_logged_in')}")
             return
         
         current_token = None
@@ -383,12 +358,12 @@ class AccountSwitcher(QMainWindow):
                 break
         
         if not current_token:
-            self.current_account_label.setText(f"{self.tr('current_login')}: {self.tr('not_logged_in')}")
+            self.current_account_label.config(text=f"{self.tr('current_login')}: {self.tr('not_logged_in')}")
             return
         
         current_parts = current_token.split('|')
         if len(current_parts) < 4:
-            self.current_account_label.setText(f"{self.tr('current_login')}: {self.tr('invalid_data')}")
+            self.current_account_label.config(text=f"{self.tr('current_login')}: {self.tr('invalid_data')}")
             return
         
         current_prefix = '|'.join(current_parts[:4])
@@ -412,10 +387,10 @@ class AccountSwitcher(QMainWindow):
         info = self.parse_account_info(current_values)
         
         if matched_account:
-            display_parts = [f"<b>{matched_account}</b>"]
+            display_parts = [f"{matched_account}"]
         else:
             masked_id = self.get_masked_token_id(current_values)
-            display_parts = [f"<b>{masked_id}</b>"]
+            display_parts = [f"{masked_id}"]
         
         if info['platform']:
             display_parts.append(info['platform'])
@@ -428,19 +403,10 @@ class AccountSwitcher(QMainWindow):
         
         display_text = f"{self.tr('current_login')}: {' | '.join(display_parts)}"
         
-        self.current_account_label.setText(display_text)
+        self.current_account_label.config(text=display_text)
 
     def refresh_current_account(self):
         self.update_current_account_display()
-
-    def normalize_account_data(self, values):
-        normalized = {}
-        for key, value in values.items():
-            for pattern in self.token_key_patterns:
-                if key.startswith(pattern):
-                    normalized[pattern] = value
-                    break
-        return normalized
 
     def get_masked_token_id(self, values):
         for key, value_data in values.items():
@@ -459,7 +425,7 @@ class AccountSwitcher(QMainWindow):
         try:
             registry_keys = self.get_registry_keys()
             if not registry_keys:
-                QMessageBox.warning(self, self.tr('error'), self.tr('registry_not_found'))
+                messagebox.showwarning(self.tr('error'), self.tr('registry_not_found'))
                 return None
             
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.registry_path, 0, winreg.KEY_READ)
@@ -477,7 +443,7 @@ class AccountSwitcher(QMainWindow):
             winreg.CloseKey(key)
             return values
         except FileNotFoundError:
-            QMessageBox.warning(self, self.tr('error'), self.tr('registry_not_found'))
+            messagebox.showwarning(self.tr('error'), self.tr('registry_not_found'))
             return None
 
     def write_registry_values(self, values):
@@ -510,7 +476,7 @@ class AccountSwitcher(QMainWindow):
             winreg.CloseKey(key)
             return True
         except Exception as e:
-            QMessageBox.critical(self, self.tr('error'), self.tr('write_failed', str(e)))
+            messagebox.showerror(self.tr('error'), self.tr('write_failed', str(e)))
             return False
 
     def save_new_account(self):
@@ -518,110 +484,90 @@ class AccountSwitcher(QMainWindow):
         if not values:
             return
 
-        name, ok = QInputDialog.getText(self, self.tr('save_account_title'), self.tr('input_account_name'))
-        if ok and name:
+        name = simpledialog.askstring(self.tr('save_account_title'), self.tr('input_account_name'))
+        if name:
             if name in self.accounts:
-                reply = QMessageBox.question(
-                    self, self.tr('confirm'), self.tr('account_exists', name),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.No:
+                if not messagebox.askyesno(self.tr('confirm'), self.tr('account_exists', name)):
                     return
 
             self.accounts[name] = values
             self.save_accounts()
             self.refresh_list()
             self.update_current_account_display()
-            QMessageBox.information(self, self.tr('success'), self.tr('account_saved', name))
+            messagebox.showinfo(self.tr('success'), self.tr('account_saved', name))
 
     def overwrite_account(self):
-        current_item = self.account_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr('tip'), self.tr('select_account_first'))
+        selection = self.account_tree.selection()
+        if not selection:
+            messagebox.showwarning(self.tr('tip'), self.tr('select_account_first'))
             return
 
-        name = current_item.data(Qt.ItemDataRole.UserRole)
+        name = self.account_tree.item(selection[0])['text']
         values = self.read_registry_values()
         if not values:
             return
 
-        reply = QMessageBox.question(
-            self, self.tr('confirm'), self.tr('overwrite_confirm', name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if messagebox.askyesno(self.tr('confirm'), self.tr('overwrite_confirm', name)):
             self.accounts[name] = values
             self.save_accounts()
             self.refresh_list()
             self.update_current_account_display()
-            QMessageBox.information(self, self.tr('success'), self.tr('account_updated', name))
+            messagebox.showinfo(self.tr('success'), self.tr('account_updated', name))
 
     def load_account(self):
-        current_item = self.account_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr('tip'), self.tr('select_account_first'))
+        selection = self.account_tree.selection()
+        if not selection:
+            messagebox.showwarning(self.tr('tip'), self.tr('select_account_first'))
             return
 
-        name = current_item.data(Qt.ItemDataRole.UserRole)
+        name = self.account_tree.item(selection[0])['text']
         values = self.accounts[name]
 
-        reply = QMessageBox.question(
-            self, self.tr('confirm'), self.tr('load_confirm', name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if messagebox.askyesno(self.tr('confirm'), self.tr('load_confirm', name)):
             if self.write_registry_values(values):
                 self.update_current_account_display()
-                QMessageBox.information(self, self.tr('success'), self.tr('account_loaded', name))
+                messagebox.showinfo(self.tr('success'), self.tr('account_loaded', name))
 
     def rename_account(self):
-        current_item = self.account_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr('tip'), self.tr('select_rename'))
+        selection = self.account_tree.selection()
+        if not selection:
+            messagebox.showwarning(self.tr('tip'), self.tr('select_rename'))
             return
 
-        old_name = current_item.data(Qt.ItemDataRole.UserRole)
-        new_name, ok = QInputDialog.getText(self, self.tr('rename_account_title'), self.tr('input_new_name'), text=old_name)
+        old_name = self.account_tree.item(selection[0])['text']
+        new_name = simpledialog.askstring(self.tr('rename_account_title'), 
+                                        self.tr('input_new_name'), initialvalue=old_name)
         
-        if ok and new_name:
-            if new_name != old_name:
-                if new_name in self.accounts:
-                    QMessageBox.warning(self, self.tr('error'), self.tr('name_exists', new_name))
-                    return
-                
-                self.accounts[new_name] = self.accounts.pop(old_name)
-                self.save_accounts()
-                self.refresh_list()
-                QMessageBox.information(self, self.tr('success'), self.tr('renamed', new_name))
+        if new_name and new_name != old_name:
+            if new_name in self.accounts:
+                messagebox.showwarning(self.tr('error'), self.tr('name_exists', new_name))
+                return
+            
+            self.accounts[new_name] = self.accounts.pop(old_name)
+            self.save_accounts()
+            self.refresh_list()
+            messagebox.showinfo(self.tr('success'), self.tr('renamed', new_name))
 
     def delete_account(self):
-        current_item = self.account_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr('tip'), self.tr('select_delete'))
+        selection = self.account_tree.selection()
+        if not selection:
+            messagebox.showwarning(self.tr('tip'), self.tr('select_delete'))
             return
 
-        name = current_item.data(Qt.ItemDataRole.UserRole)
-        reply = QMessageBox.question(
-            self, self.tr('confirm'), self.tr('delete_confirm', name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        name = self.account_tree.item(selection[0])['text']
+        if messagebox.askyesno(self.tr('confirm'), self.tr('delete_confirm', name)):
             del self.accounts[name]
             self.save_accounts()
             self.refresh_list()
-            QMessageBox.information(self, self.tr('success'), self.tr('account_deleted', name))
+            messagebox.showinfo(self.tr('success'), self.tr('account_deleted', name))
 
     def logout_account(self):
-        reply = QMessageBox.question(
-            self, self.tr('confirm'), self.tr('logout_confirm'),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if messagebox.askyesno(self.tr('confirm'), self.tr('logout_confirm')):
             registry_keys = self.get_registry_keys()
             empty_values = {key_name: {'data': '', 'type': winreg.REG_BINARY} for key_name in registry_keys.values()}
             if self.write_registry_values(empty_values):
                 self.update_current_account_display()
-                QMessageBox.information(self, self.tr('success'), self.tr('logged_out'))
+                messagebox.showinfo(self.tr('success'), self.tr('logged_out'))
 
     def refresh_token(self):
         current_values = self.read_registry_values()
@@ -636,13 +582,13 @@ class AccountSwitcher(QMainWindow):
                 break
         
         if not current_token:
-            QMessageBox.warning(self, self.tr('error'), self.tr('no_token'))
+            messagebox.showwarning(self.tr('error'), self.tr('no_token'))
             return
         
         try:
             current_parts = current_token.split('|')
             if len(current_parts) < 4:
-                QMessageBox.warning(self, self.tr('error'), self.tr('invalid_token'))
+                messagebox.showwarning(self.tr('error'), self.tr('invalid_token'))
                 return
             
             current_prefix = '|'.join(current_parts[:4])
@@ -664,23 +610,18 @@ class AccountSwitcher(QMainWindow):
                     break
             
             if matched_account:
-                reply = QMessageBox.question(
-                    self, self.tr('confirm'), 
-                    self.tr('matched_account', matched_account),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.Yes:
+                if messagebox.askyesno(self.tr('confirm'), self.tr('matched_account', matched_account)):
                     self.accounts[matched_account] = current_values
                     self.save_accounts()
                     self.refresh_list()
                     self.update_current_account_display()
-                    QMessageBox.information(self, self.tr('success'), self.tr('token_updated', matched_account))
+                    messagebox.showinfo(self.tr('success'), self.tr('token_updated', matched_account))
             else:
                 masked_prefix = self.mask_prefix(current_prefix)
-                QMessageBox.information(self, self.tr('tip'), self.tr('no_match', masked_prefix))
+                messagebox.showinfo(self.tr('tip'), self.tr('no_match', masked_prefix))
         
         except Exception as e:
-            QMessageBox.critical(self, self.tr('error'), self.tr('refresh_failed', str(e)))
+            messagebox.showerror(self.tr('error'), self.tr('refresh_failed', str(e)))
 
     def mask_prefix(self, prefix):
         parts = prefix.split('|')
@@ -693,7 +634,4 @@ class AccountSwitcher(QMainWindow):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = AccountSwitcher()
-    window.show()
-    sys.exit(app.exec())
+    app = AccountSwitcher()
